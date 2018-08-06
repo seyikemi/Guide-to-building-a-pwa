@@ -1,0 +1,488 @@
+PWA Caching files - first feature
+main.js files
+1. check if the browser supports service worker and push notification. 
+Note**
+Add the manifest link and the main.js in the index page.
+no need to add the sw.js cus the main.js would call the sw.js.
+
+if ('serviceWorker' in navigator && 'PushManager' in window) {
+  console.log('Service Worker and Push is supported');
+
+  navigator.serviceWorker.register('sw.js')
+  .then(function(swReg) {
+    console.log('Service Worker is registered', swReg);
+
+    swRegistration = swReg;
+    initializeUI();
+  })
+  .catch(function(error) {
+    console.error('Service Worker Error', error);
+  });
+} else {
+  console.warn('Push messaging is not supported');
+  pushButton.textContent = 'Push Not Supported';
+}
+
+2. if it supported it would register the service worker.
+
+3. install and activate the service worker
+Sw.js 
+it listens for the event 
+installs the service worker and activate it on the browser.
+
+self.addEventListener('install', (event) => {
+  console.log('service worker installed', event);
+  });
+  self.addEventListener('activate', (event) => {
+  console.log('service worker activated', event);
+  });
+
+
+
+4. after install it listens for the installed events, check if the there is no cahce 
+ and creates a cache, it waits until all the files are added into the cache.
+
+// Cache API 
+self.addEventListener('install', (event) => {  
+  if (!('caches' in self)) return;  
+// this makes sure your cache is done or ur promise resolved; it extends the lfetime if install
+event.waitUntil(
+    // if the caching fails for some reason, the promise is rejected and the service worker isn’t installed. 
+caches.open('v1').then((cache) => {     
+     return cache.addAll(       
+          [  '/about.html',
+          '/actor.html',
+          '/add-audio.html',
+          '/add-photo.html',
+          '/add-video.html',
+          '/applicant.html',
+          '/audio.html',
+          '/audition-d.html',
+          '/audition-details.html',
+          '/audition.html',
+          '/auditions.html',
+          '/blog.html',
+          '/contact.html',
+          '/dashboard.html',
+          '/errorpage.html',
+          '/details.html',
+          '/director.html',
+          '/edit-profile.html',  
+          '/home.html',
+          '/index.html',
+          '/login.html',
+          '/main.js',
+          '/my-auditions.html', 
+          '/panel.html', 
+          '/photo.html',
+          '/pricing.html',
+          '/profile-image.html',
+          '/profile.html',  
+          '/register.html',  
+          '/sw.js', 
+          '/manifest.json',  
+          '/video.html',
+          '/slick/slick-theme.css',
+          '/slick/slick.css',
+          '/js/wow.min.js',
+          '/css/hover.css',
+          '/css/animate.css',
+          '/css/main.css',
+          '/images/favicon.ico',
+          '/images/logo1.png',
+          '/images/chiar.png',
+            '/slick/slick.min.js',
+            '/images/ev.jpg',
+            '/images/ev1.jpg',
+            '/images/ev2.jpg',
+            '/images/ev3.jpg',
+            '/images/one.jpg',
+            '/images/2.jpg',
+            '/images/3.jpg',
+            '/images/4.jpg',
+            '/images/board3.png',
+            '/images/lgm1.png',
+            '/images/quotes-1.png',
+            '/images/urs.jpg',
+            '/images/quotes-1.png',
+            '/images/urs2.jpg',
+            '/images/bg-new.jpg',
+            '/images/bg-new2.jpg',
+            'images/ban1.jpg',
+            'images/ban2.jpg',
+            'images/ban3.jpg',
+            'images/urs1.jpg',
+            'images/urs2.jpg',
+          
+           '/vendor/bootstrap/css/bootstrap-grid.min.css', 
+      
+          '/vendor/bootstrap/css/bootstrap-reboot.min.css', 
+          
+          '/vendor/bootstrap/css/bootstrap.min.css', 
+          
+       
+
+          '/js/jquery.inview.min.js',
+          '/js/jquery.youtube-inview-autoplay.js', 
+          '/vendor/bootstrap/js/bootstrap.bundle.min.js', 
+      
+          '/vendor/bootstrap/js/bootstrap.min.js',
+
+          '/vendor/jquery/jquery.min.js', 
+          '/vendor/jquery/jquery.slim.min.js',
+          
+            ]      
+        
+        ); 
+       })  
+    ); 
+});
+
+
+
+PWA (Serving the cache files offline)
+5. it wait for the fetch event and serves from either cache or the network. if there
+is no file in the cache or no network it would serve an offline page (error404.html) page
+
+
+ 
+self.addEventListener('fetch', (event) => {
+  if( !navigator.onLine && event.request.url.indexOf('index.html') !== -1) {
+   
+    event.respondWith(showOfflineLanding(event));
+
+// if one fails it would lead to an error so we use match to tell the service worker to go ahead and fetch what it has .
+// if there is an error it logs the error and tells you if it was rejected or not.
+// fetch from cache and network at the same time (called stale while)
+
+
+}
+else {
+  event.respondWith(pullFromCache(event));
+
+}
+});
+
+
+
+function showOfflineLanding(event) {
+return caches.match(new Request('errorpage.html'));
+}
+
+
+
+function pullFromCache(event) {
+return caches.match(event.request).then((response) => {
+return response || fetch(event.request).then((response) => {
+return caches.open('v1').then((cache) => {
+cache.put(event.request, response.clone());
+return response;
+});
+});
+});
+}
+
+
+
+
+
+//stalewhilerevalidate
+self.addEventListener('fetch', (event) => {
+  const version = 'v1';
+  event.respondWith(
+  caches.open(version).then((cache) => {
+  return cache.match(event.request).then((response) => {
+  let fetchPromise = fetch(event.request).then((networkResponse) => {
+  cache.put(event.request, networkResponse.clone());
+  return networkResponse;
+  });
+  event.waitUntil(fetchPromise);
+  return response;
+  })
+  })
+  );
+  });
+
+
+  self.addEventListener('fetch', (event) => {
+    const version = 'v1';
+    const placeholderAssetURL = 'errorpage.html';
+    event.respondWith(
+    fetch(event.request).catch((e) => { // fetch fails
+
+  
+      return caches.open(version).then((cache) => {
+      return cache.match(placeholderAssetURL);
+      });
+      })
+      );
+      });
+
+
+PWA (self updating the cache when there is new content form the internet)
+6. update the cache ( update old content and add new content) 
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+    console.log('updated service worker installed', event);
+    });
+    self.addEventListener('activate', (event) => {
+      console.log('updated service worker activated', event);
+      });
+
+7. Adding to homescreen feature.
+note* the icons must be resize for the different icon sizes put in the manifest.json file
+{  "name": "cast.i.ng", 
+     "short_name": "cast ng",  
+     "scope": "./",
+     "start_url": "index.html", 
+      "display": "minimal-ui",  
+      "theme_color": "#3f0048",
+        "background_color": "#e7077d", 
+         "description": "The best Talent in the land get hired here",
+           "icons": [{    "src": "images/castb.png",
+                "sizes": "48x48",   
+                 "type": "image/png"  },
+                  {    "src": "images/castb.png", 
+                       "sizes": "72x72",   
+                        "type": "image/png"  },
+                         {    "src": "images/castb.png",
+                                "sizes": "96x96",  
+                                  "type": "image/png"  }, 
+                            {    "src": "images/castb.png",
+                                    "sizes": "144x144", 
+                                       "type": "image/png"  },
+                            {    "src": "images/castb.png",  
+                                  "sizes": "168x168",   
+                                   "type": "image/png"  }, 
+                            {    "src": "images/castb.png",  
+                                  "sizes": "192x192",  
+                                    "type": "image/png"  },
+                                     {    "src": "images/castb.png", 
+                                           "sizes": "512x512",   
+                                            "type": "image/png"  }],
+                                              "prefer_related_applications": false,
+                                              "orientation": "portrait" }
+
+
+
+basic things that must be present in the manifest : name , short name, scope , display , 
+theme color, background color, description and icon . 
+other things: bluetooth, prefer_related application etc .
+
+
+7. PWA feature push notification 
+ after it checks if the push notification is registered, it calls intialize Ui function 
+
+const applicationServerPublicKey = 'BHTaWyiIIDlv-k2GlEU1j92XU1iNJbIyAKPlv718Jvz-M25h3IXCdL7YydY5JgJvk5QLT6e0oeTAl6UcGI_wPz8';
+const pushButton = document.querySelector('.js-push-btn');
+
+let isSubscribed = false;
+let swRegistration = null;
+function initializeUI() {
+  pushButton.addEventListener('click', function() {
+    pushButton.disabled = true;
+    if (isSubscribed) {
+      unsubscribeUser();
+    } else {
+      subscribeUser();
+    }
+  });
+
+this checks if the user has subscribe to a push notification already ,
+if not call the subscribe function .
+
+
+function subscribeUser() {
+  const applicationServerKey = urlB64ToUint8Array(applicationServerPublicKey);
+  swRegistration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: applicationServerKey
+  })
+  .then(function(subscription) {
+    console.log('User is subscribed.');
+
+    updateSubscriptionOnServer(subscription);
+
+    isSubscribed = true;
+    displayNotification() ;
+
+    updateBtn();
+    
+  })
+  .catch(function(err) {
+    console.log('Failed to subscribe the user: ', err);
+    updateBtn();
+  });
+}
+
+
+A server was already generated using firebase cloud messaging (FCM)
+and was encoded into 8bit  .
+the subscribe function throw the notification into the browser , if the user 
+subcsribe(grants permission) it update the button with the (css class of js-push-btn)
+ else it consoles an error that user idnt subscribed and updates the button.
+
+once the subscription is successful it call display notification function . 
+let data = {
+  body: {
+    tt: "Hello Great People"
+  }
+}
+
+function displayNotification() {
+
+  if (Notification.permission == 'granted') {
+    navigator.serviceWorker.getRegistration()
+    .then(function(reg) {
+      var options = {
+        body: data.body.tt,
+        icon: 'images/castb.png',
+        vibrate: [100, 50, 100],
+        data: {
+          dateOfArrival: Date.now(),
+          primaryKey: 1
+        },
+        actions: [
+          {action : "explore" , title:"see notification" },
+          {action: "close" , title: "no thank you" },
+        ]
+      };
+      
+      reg.showNotification('You have one notification from cast.i.ng', options);
+  
+    });
+  }
+}
+
+function urlB64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+if (Notification.permission !== 'denied' || Notification.permission === "default") {
+  Notification.requestPermission(function (permission) {
+    // If the user accepts, let's create a notification
+    if (permission === "granted") {
+      var notification = new Notification("Cast.i.ng would be sending you notifications.");
+      subscribeUser();
+    }
+  });
+}
+
+
+//this encodes the server key and checks for permission,
+-this displays a custom message we would pass on to the data object.
+-the subscribe function also calls the updatesubscription function .
+
+function updateSubscriptionOnServer(subscription) {
+
+    $.get("https://baconipsum.com/api/?type=all-meat&paras=2&start-with-lorem=1", function(data, status){
+        console.log("Data: " + data + "\nStatus: " + status);
+    });
+
+//  get the subscription of the user and sends it along with the user id to the server (the user id shows if the usrr has logged in else post normald notifications like .promo etc. if login get the status to know if its a actor or a director.)
+  //   $.post("https://baconipsum.com/api/?type=all-meat&paras=2&start-with-lorem=1",
+  //   {
+  //       subscription: subscription ,
+  //       userid: "userid"
+  //   },
+
+  // );
+
+  const subscriptionJson = document.querySelector('.js-subscription-json');
+  const subscriptionDetails =
+    document.querySelector('.js-subscription-details');
+
+  //if (subscription) {
+   // console.log(subscription);
+    
+  //  subscriptionJson.textContent = JSON.stringify(subscription);
+   // subscriptionDetails.classList.remove('is-invisible');
+ // } else {
+    subscriptionDetails.classList.add('is-invisible');
+ // }
+  // console.log(subscription.keys);
+  // console.log(subscriptionJson+'kore');
+//}
+
+this sends the subscription to the server and update the server when a user subscribes 
+and when they unsubscribe ... and wat they subscribed for together with their user id 
+
+
+
+unsubscribing a user calls the unsuscribe function
+
+function unsubscribeUser() {
+  swRegistration.pushManager.getSubscription()
+  .then(function(subscription) {
+    if (subscription) {
+      return subscription.unsubscribe();
+    }
+  })
+  .catch(function(error) {
+    console.log('Error unsubscribing', error);
+  })
+  .then(function() {
+    updateSubscriptionOnServer(null);
+
+    console.log('User is unsubscribed.');
+    isSubscribed = false;
+
+    updateBtn();
+   
+  });
+}
+
+
+
+
+updating the button
+function updateBtn() {
+  if (Notification.permission === 'denied') {
+    pushButton.textContent = 'Push Messaging Blocked.';
+    pushButton.disabled = true;
+    updateSubscriptionOnServer(null);
+    return;
+  }
+
+  if (isSubscribed) {
+    pushButton.textContent = 'Disable Push Messaging';
+  } else {
+    pushButton.textContent = 'Enable Push Messaging';
+  }
+
+  pushButton.disabled = false;
+}
+
+
+
+
+
+
+
+//we have to add a listener in the sw.js that would check and listen for a push event  
+      self.addEventListener('push', function(event) {
+        var title = 'Yay a message.';
+        var body = 'We have received a push message.';
+        var icon = '/images/smiley.svg';
+        var tag = 'simple-push-example-tag';
+        event.waitUntil(
+          self.registration.showNotification(title, {
+            body: body,
+            icon: icon,
+            tag: tag
+          })
+        );
+      });
+
+
